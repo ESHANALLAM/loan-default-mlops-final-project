@@ -14,3 +14,4 @@
 - Phase 10 manual: Render deployment remains for the user to complete in the browser.
 - Phase 11 complete: README and RUNBOOK created.
 - Phase 12 complete: final tests pass, drift alert verified, Docker build and container health verified, and model files are tracked in Git.
+- Feature update complete: cookie-based login/register/logout, SQLite account and prediction history storage, rupee labels, and readable Top Risk Drivers chart labels added and deployed.
