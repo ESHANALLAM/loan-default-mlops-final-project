@@ -13,3 +13,23 @@ def test_predict():
     r = c.post("/predict", json=SAMPLE)
     assert r.status_code == 200
     assert 0 <= r.json()["default_probability"] <= 1
+
+
+def test_register_login_and_history():
+    email = "demo@example.com"
+    registered = c.post("/auth/register", json={
+        "name": "Demo User", "email": email, "password": "secret123"
+    })
+    assert registered.status_code in (200, 409)
+    if registered.status_code == 409:
+        logged_in = c.post("/auth/login", json={
+            "name": "", "email": email, "password": "secret123"
+        })
+        assert logged_in.status_code == 200
+    else:
+        assert registered.status_code == 200
+    predicted = c.post("/predict", json=SAMPLE)
+    assert predicted.status_code == 200
+    history = c.get("/auth/me")
+    assert history.status_code == 200
+    assert len(history.json()["predictions"]) >= 1

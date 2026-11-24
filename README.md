@@ -71,6 +71,10 @@ The production promotion gate accepts only a higher ROC-AUC. The first model was
 | `/metrics` | GET | Current promoted-model metrics |
 | `/recent` | GET | Recent prediction log |
 | `/health` | GET | Health check |
+| `/auth/register` | POST | Create an account and start a session |
+| `/auth/login` | POST | Log in and start a session |
+| `/auth/logout` | POST | End the current session |
+| `/auth/me` | GET | Current user and personal prediction history |
 | `/docs` | GET | Swagger API documentation |
 
 ## Risk bands
@@ -87,8 +91,9 @@ The production promotion gate accepts only a higher ROC-AUC. The first model was
 - Recall at threshold 0.5 is low; changing the threshold is a business decision.
 - The promotion gate uses one metric only.
 - Drift warns of input change but does not prove accuracy changed.
-- This demo lacks fairness testing, explainability, authentication, and production audit controls.
+- The SQLite account store is suitable for a demo; it requires persistent storage and production hardening before real use.
+- This demo lacks production fairness testing, advanced explainability, multi-factor authentication, and enterprise audit controls.
 
 ## Future scope
 
-Add real outcomes, multi-metric promotion gates, probability calibration, fairness checks, explainability, authentication, and real-time retraining and deployment automation.
+Add real outcomes, multi-metric promotion gates, probability calibration, fairness checks, explainability, managed database storage, multi-factor authentication, and real-time retraining and deployment automation.

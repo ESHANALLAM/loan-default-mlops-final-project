@@ -32,18 +32,20 @@
   .low{background:var(--low)}.medium{background:var(--med)}.high{background:var(--high)}.decision{margin-top:10px;font-size:15px;color:var(--navy2)}.decision b{color:var(--navy)}.placeholder{color:var(--muted);font-size:14px}.err{color:var(--high);margin-top:14px;font-size:13.5px}
   table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:var(--muted);font-weight:700;text-transform:uppercase;font-size:10.5px;letter-spacing:.04em;padding:8px 10px;border-bottom:1.5px solid var(--border)}
   td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--navy2)}tr:last-child td{border-bottom:none}.rl{display:inline-block;padding:2px 9px;border-radius:999px;color:#fff;font-size:10.5px;font-weight:700}.empty-row td{color:var(--muted);text-align:center;padding:22px}
+  .auth-actions{display:flex;gap:8px}.auth-actions button{margin:0;width:auto;min-width:92px;padding:9px 12px}.auth-actions .secondary{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22)}
+  .auth-card{position:fixed;inset:0;background:rgba(16,27,52,.58);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}.auth-card.open{display:flex}.auth-box{width:min(420px,100%);background:#fff;border-radius:16px;padding:24px}.auth-box h2{margin-top:0}.auth-box input{margin-bottom:12px}.auth-box .auth-submit{margin-top:4px}.auth-tabs{display:flex;gap:8px;margin-bottom:16px}.auth-tabs button{margin:0;background:#eef1f7;color:var(--navy)}.auth-tabs button.active{background:var(--teal);color:#fff}.auth-message{min-height:20px;color:var(--high);font-size:13px}
   @media(max-width:880px){.grid2{grid-template-columns:1fr}.fgrid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
-<header><div class="row"><div><h1>Loan Default Risk Dashboard</h1><p>Live borrower scoring backed by an XGBoost model tracked in MLflow and served through FastAPI.</p></div><span class="pill"><span class="dot"></span> Model live</span></div></header>
+<header><div class="row"><div><h1>Loan Default Risk Dashboard</h1><p>Live borrower scoring backed by an XGBoost model tracked in MLflow and served through FastAPI.</p></div><div class="auth-actions"><span class="pill"><span class="dot"></span> Model live</span><button id="loginBtn" class="secondary" type="button">Login</button><button id="logoutBtn" class="secondary" type="button" style="display:none">Logout</button></div></div></header>
 <main>
   <div class="stats" id="statCards"></div>
   <div class="grid2">
     <div class="card"><h2>New Application</h2><p class="sub">Enter borrower details and score in real time.</p>
       <form id="f"><div class="fgrid">
-        <div><label>Age</label><input name="age" type="number" value="35" required></div><div><label>Annual income ($)</label><input name="annual_income" type="number" value="55000" required></div>
-        <div><label>Loan amount ($)</label><input name="loan_amount" type="number" value="15000" required></div><div><label>Interest rate (%)</label><input name="interest_rate" type="number" step="0.1" value="14.5" required></div>
+        <div><label>Age</label><input name="age" type="number" value="35" required></div><div><label>Annual income (₹)</label><input name="annual_income" type="number" value="55000" required></div>
+        <div><label>Loan amount (₹)</label><input name="loan_amount" type="number" value="15000" required></div><div><label>Interest rate (%)</label><input name="interest_rate" type="number" step="0.1" value="14.5" required></div>
         <div><label>Loan term (months)</label><select name="loan_term_months"><option value="36">36</option><option value="60">60</option></select></div><div><label>Credit score</label><input name="credit_score" type="number" value="640" required></div>
         <div><label>Employment (yrs)</label><input name="employment_years" type="number" step="0.1" value="4" required></div><div><label>Debt-to-income (%)</label><input name="dti" type="number" step="0.1" value="22" required></div>
         <div><label>Open accounts</label><input name="open_accounts" type="number" value="6" required></div><div><label>Home ownership</label><select name="home_ownership"><option>RENT</option><option>MORTGAGE</option><option>OWN</option></select></div>
@@ -56,12 +58,26 @@
     <div class="card"><h2>Recent Predictions</h2><p class="sub">Latest requests served by the API.</p><table id="recentTable"><thead><tr><th>Credit</th><th>DTI</th><th>Prob.</th><th>Risk</th></tr></thead><tbody><tr class="empty-row"><td colspan="4">No predictions yet</td></tr></tbody></table></div>
   </div>
 </main>
+<div class="auth-card" id="authCard">
+  <div class="auth-box">
+    <h2 id="authTitle">Login</h2>
+    <div class="auth-tabs"><button type="button" id="loginTab" class="active">Login</button><button type="button" id="registerTab">Register</button></div>
+    <form id="authForm">
+      <div id="nameField" style="display:none"><label>Full name</label><input name="name" type="text"></div>
+      <label>Email</label><input name="email" type="email" required>
+      <label>Password</label><input name="password" type="password" minlength="6" required>
+      <div class="auth-message" id="authMessage"></div>
+      <button type="submit" class="auth-submit" id="authSubmit">Login</button>
+    </form>
+  </div>
+</div>
 <script>
 const RISK_COLOR={LOW:'#1fa06a',MEDIUM:'#e0a512',HIGH:'#e5484d'};let gauge,impChart;
 function statCard(lbl,val){return `<div class="stat-card"><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`}
 async function loadMetrics(){try{const m=await(await fetch('/metrics')).json();const box=document.getElementById('statCards');if(!m||!m.roc_auc){box.innerHTML=statCard('Status','No model yet');return}
 box.innerHTML=statCard('ROC-AUC',m.roc_auc.toFixed(3))+statCard('Accuracy',(m.accuracy*100).toFixed(1)+'%')+statCard('Precision',(m.precision*100).toFixed(1)+'%')+statCard('Recall',(m.recall*100).toFixed(1)+'%');
-const labels=(m.feature_importance||[]).map(f=>f[0]),values=(m.feature_importance||[]).map(f=>f[1]);if(impChart)impChart.destroy();impChart=new Chart(document.getElementById('impChart'),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#12b3a8',borderRadius:6,maxBarThickness:26}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'#eef1f7'}},y:{grid:{display:false}}}}})}catch(e){console.error(e)}}
+const nameMap={interest_rate:'Interest Rate',loan_to_income:'Loan to Income',credit_score:'Credit Score',dti:'Debt to Income',annual_income:'Annual Income',loan_amount:'Loan Amount',employment_years:'Employment Years',open_accounts:'Open Accounts',loan_term_months:'Loan Term',home_ownership:'Home Ownership',age:'Age'};
+const labels=(m.feature_importance||[]).map(f=>nameMap[f[0]]||f[0].replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()));const values=(m.feature_importance||[]).map(f=>f[1]);if(impChart)impChart.destroy();impChart=new Chart(document.getElementById('impChart'),{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'#12b3a8',borderRadius:6,maxBarThickness:26}]},options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'#eef1f7'}},y:{grid:{display:false}}}}})}catch(e){console.error(e)}
 function riskBadge(level){return `<span class="rl" style="background:${RISK_COLOR[level]}">${level}</span>`}
 async function loadRecent(){try{const rows=await(await fetch('/recent?n=8')).json();const body=document.querySelector('#recentTable tbody');if(!rows.length){body.innerHTML='<tr class="empty-row"><td colspan="4">No predictions yet</td></tr>';return}
 body.innerHTML=rows.map(r=>`<tr><td>${r.credit_score}</td><td>${r.dti}%</td><td>${(r.probability*100).toFixed(1)}%</td><td>${riskBadge(r.probability<0.2?'LOW':r.probability<0.5?'MEDIUM':'HIGH')}</td></tr>`).join('')}catch(e){console.error(e)}}
@@ -69,7 +85,19 @@ function drawGauge(prob,level){const wrap=document.getElementById('resultwrap');
 if(gauge)gauge.destroy();gauge=new Chart(document.getElementById('gaugeCanvas'),{type:'doughnut',data:{datasets:[{data:[prob,1-prob],backgroundColor:[RISK_COLOR[level],'#eef1f7'],borderWidth:0}]},options:{cutout:'78%',circumference:360,rotation:0,plugins:{legend:{display:false},tooltip:{enabled:false}},animation:{animateRotate:true}}})}
 const f=document.getElementById('f');f.addEventListener('submit',async(e)=>{e.preventDefault();const btn=document.getElementById('btn'),err=document.getElementById('err');err.textContent='';btn.disabled=true;btn.textContent='Scoring...';const data=Object.fromEntries(new FormData(f).entries());for(const k of ['age','annual_income','loan_amount','interest_rate','loan_term_months','credit_score','employment_years','dti','open_accounts'])data[k]=Number(data[k]);
 try{const r=await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});if(!r.ok)throw new Error('Server returned '+r.status);const j=await r.json();drawGauge(j.default_probability,j.risk_level);document.getElementById('decisionLine').innerHTML='Decision: <b>'+j.decision+'</b>';loadRecent()}catch(ex){err.textContent='Could not reach the API: '+ex.message}finally{btn.disabled=false;btn.textContent='Score application'}});
-loadMetrics();loadRecent();
+let authMode='login';
+const authCard=document.getElementById('authCard'),authForm=document.getElementById('authForm');
+function setAuthMode(mode){authMode=mode;document.getElementById('authTitle').textContent=mode==='login'?'Login':'Register';document.getElementById('authSubmit').textContent=mode==='login'?'Login':'Create account';document.getElementById('nameField').style.display=mode==='register'?'block':'none';document.getElementById('loginTab').classList.toggle('active',mode==='login');document.getElementById('registerTab').classList.toggle('active',mode==='register');document.getElementById('authMessage').textContent=''}
+document.getElementById('loginBtn').addEventListener('click',()=>{setAuthMode('login');authCard.classList.add('open')});
+document.getElementById('loginTab').addEventListener('click',()=>setAuthMode('login'));
+document.getElementById('registerTab').addEventListener('click',()=>setAuthMode('register'));
+authCard.addEventListener('click',(e)=>{if(e.target===authCard)authCard.classList.remove('open')});
+authForm.addEventListener('submit',async(e)=>{e.preventDefault();const data=Object.fromEntries(new FormData(authForm).entries());try{const r=await fetch('/auth/'+authMode,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const j=await r.json();if(!r.ok)throw new Error(j.detail||'Authentication failed');authCard.classList.remove('open');updateUser();authForm.reset()}catch(ex){document.getElementById('authMessage').textContent=ex.message}});
+document.getElementById('logoutBtn').addEventListener('click',async()=>{await fetch('/auth/logout',{method:'POST'});updateUser()});
+async function updateUser(){try{const r=await fetch('/auth/me');if(r.ok){const j=await r.json();document.getElementById('loginBtn').textContent=j.user.name;document.getElementById('loginBtn').disabled=true;document.getElementById('logoutBtn').style.display='inline-flex';loadRecent(j.predictions)}else{document.getElementById('loginBtn').textContent='Login';document.getElementById('loginBtn').disabled=false;document.getElementById('logoutBtn').style.display='none';loadRecent()}}catch(e){loadRecent()}}
+function loadRecent(rows){if(rows){const body=document.querySelector('#recentTable tbody');if(!rows.length){body.innerHTML='<tr class="empty-row"><td colspan="4">No predictions yet</td></tr>';return}body.innerHTML=rows.map(r=>`<tr><td>${r.credit_score}</td><td>${r.dti}%</td><td>${(r.probability*100).toFixed(1)}%</td><td>${riskBadge(r.risk_level)}</td></tr>`).join('')}else{return fetch('/recent?n=8').then(r=>r.json()).then(rows=>loadRecent(rows))}
+}
+loadMetrics();updateUser();
 </script>
 </body>
 </html>
