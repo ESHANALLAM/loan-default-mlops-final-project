@@ -1,0 +1,6 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Drift Report</title>
+<style>body{font-family:Arial,sans-serif;margin:40px}table{border-collapse:collapse}th,td{border:1px solid #ddd;padding:8px}th{background:#101b34;color:white}</style>
+</head><body><h1>Data Drift Report</h1><p>Fallback report: Evidently native imports are blocked by Windows Application Control.</p>
+<p><b>Drifted columns: 4 of 10 (40%)</b></p>
+<table><tr><th>Feature</th><th>Mean shift (std units)</th><th>Status</th></tr><tr><td>interest_rate</td><td>1.329</td><td>DRIFT</td></tr><tr><td>dti</td><td>0.783</td><td>DRIFT</td></tr><tr><td>annual_income</td><td>0.476</td><td>DRIFT</td></tr><tr><td>credit_score</td><td>0.454</td><td>DRIFT</td></tr><tr><td>employment_years</td><td>0.028</td><td>OK</td></tr><tr><td>age</td><td>0.023</td><td>OK</td></tr><tr><td>loan_amount</td><td>0.014</td><td>OK</td></tr><tr><td>loan_term_months</td><td>0.009</td><td>OK</td></tr><tr><td>open_accounts</td><td>0.001</td><td>OK</td></tr></table>
+<p><b>DRIFT DETECTED -> retrain model</b></p></body></html>

@@ -1,0 +1,42 @@
+{
+  "roc_auc": 0.6964919826198195,
+  "accuracy": 0.765,
+  "precision": 0.5365853658536586,
+  "recall": 0.09243697478991597,
+  "f1": 0.15770609318996415,
+  "feature_importance": [
+    [
+      "interest_rate",
+      0.1767318695783615
+    ],
+    [
+      "credit_score",
+      0.17096395790576935
+    ],
+    [
+      "loan_to_income",
+      0.17048926651477814
+    ],
+    [
+      "dti",
+      0.1317126601934433
+    ],
+    [
+      "loan_amount",
+      0.07052794098854065
+    ],
+    [
+      "employment_years",
+      0.0649862214922905
+    ]
+  ],
+  "params": {
+    "n_estimators": 150,
+    "max_depth": 2,
+    "learning_rate": 0.05,
+    "eval_metric": "logloss",
+    "random_state": 42
+  },
+  "data_rows": 5000,
+  "trained_at": "2026-11-24T20:29:13"
+}
