@@ -13,3 +13,4 @@
 - Phase 9 prepared: CI workflow exists; final model and metrics will be committed and prepared for manual GitHub push.
 - Phase 10 manual: Render deployment remains for the user to complete in the browser.
 - Phase 11 complete: README and RUNBOOK created.
+- Phase 12 complete: final tests pass, drift alert verified, Docker build and container health verified, and model files are tracked in Git.
