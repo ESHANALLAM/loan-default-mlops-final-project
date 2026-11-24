@@ -11,3 +11,4 @@ pydantic
 httpx
 pytest
 evidently==0.4.40
+psycopg[binary]

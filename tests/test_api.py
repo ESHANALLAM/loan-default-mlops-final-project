@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi.testclient import TestClient
 from src.api import app
 
@@ -11,25 +13,46 @@ def test_health():
 
 def test_predict():
     r = c.post("/predict", json=SAMPLE)
-    assert r.status_code == 200
-    assert 0 <= r.json()["default_probability"] <= 1
+    assert r.status_code == 401
+    assert c.get("/recent").status_code == 401
 
 
-def test_register_login_and_history():
-    email = "demo@example.com"
-    registered = c.post("/auth/register", json={
-        "name": "Demo User", "email": email, "password": "secret123"
+def test_login_first_page():
+    response = c.get("/")
+    assert response.status_code == 200
+    assert response.text.index('id="authPage"') < response.text.index('id="appShell"')
+    assert 'id="registerTab"' in response.text
+
+
+def test_account_prediction_history_is_private_and_remembered():
+    email_a = f"user-{uuid.uuid4().hex}@example.com"
+    email_b = f"user-{uuid.uuid4().hex}@example.com"
+    user_a = TestClient(app)
+    user_b = TestClient(app)
+
+    registered = user_a.post("/auth/register", json={
+        "name": "Demo User", "email": email_a, "password": "secret123"
     })
-    assert registered.status_code in (200, 409)
-    if registered.status_code == 409:
-        logged_in = c.post("/auth/login", json={
-            "name": "", "email": email, "password": "secret123"
-        })
-        assert logged_in.status_code == 200
-    else:
-        assert registered.status_code == 200
-    predicted = c.post("/predict", json=SAMPLE)
+    assert registered.status_code == 200
+    predicted = user_a.post("/predict", json=SAMPLE)
     assert predicted.status_code == 200
-    history = c.get("/auth/me")
+    history = user_a.get("/auth/me")
     assert history.status_code == 200
-    assert len(history.json()["predictions"]) >= 1
+    assert len(history.json()["predictions"]) == 1
+
+    assert user_b.get("/auth/me").status_code == 401
+    assert user_b.get("/recent").status_code == 401
+    registered_b = user_b.post("/auth/register", json={
+        "name": "Other User", "email": email_b, "password": "secret123"
+    })
+    assert registered_b.status_code == 200
+    assert user_b.get("/auth/me").json()["predictions"] == []
+
+    returning_user = TestClient(app)
+    logged_in = returning_user.post("/auth/login", json={
+        "email": email_a, "password": "secret123"
+    })
+    assert logged_in.status_code == 200
+    assert len(returning_user.get("/auth/me").json()["predictions"]) == 1
+    assert returning_user.post("/auth/logout").status_code == 200
+    assert returning_user.get("/auth/me").status_code == 401

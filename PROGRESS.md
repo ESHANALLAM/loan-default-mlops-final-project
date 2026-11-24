@@ -15,3 +15,4 @@
 - Phase 11 complete: README and RUNBOOK created.
 - Phase 12 complete: final tests pass, drift alert verified, Docker build and container health verified, and model files are tracked in Git.
 - Feature update complete: cookie-based login/register/logout, SQLite account and prediction history storage, rupee labels, and readable Top Risk Drivers chart labels added and deployed.
+- Auth-first and PostgreSQL support implemented and validated locally: dashboard is gated until login; prediction and recent-history endpoints require a session and isolate rows by user. Configure the secret `DATABASE_URL` in Render before deploying; existing SQLite data is not automatically migrated.

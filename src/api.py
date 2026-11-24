@@ -10,28 +10,70 @@ app = FastAPI(title="Loan Default Prediction API", version="1.0")
 model = joblib.load("models/model.joblib")
 LOG = "logs/predictions.csv"
 DB = os.getenv("APP_DB_PATH", "data/app.db")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
+class DatabaseConnection:
+    def __init__(self, connection, postgres=False):
+        self.connection = connection
+        self.postgres = postgres
+
+    def execute(self, query, params=()):
+        if self.postgres:
+            query = query.replace("?", "%s")
+        return self.connection.execute(query, params)
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type is None:
+            self.commit()
+        else:
+            self.connection.rollback()
+        self.close()
 
 
 def db():
-    os.makedirs(os.path.dirname(DB), exist_ok=True)
-    con = sqlite3.connect(DB)
-    con.row_factory = sqlite3.Row
-    con.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+    if DATABASE_URL:
+        import psycopg
+        from psycopg.rows import dict_row
+
+        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        con = DatabaseConnection(psycopg.connect(url, row_factory=dict_row), postgres=True)
+        id_type = "BIGSERIAL PRIMARY KEY"
+        user_id_type = "BIGINT"
+    else:
+        db_dir = os.path.dirname(DB)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
+        con = DatabaseConnection(sqlite3.connect(DB))
+        con.connection.row_factory = sqlite3.Row
+        id_type = "INTEGER PRIMARY KEY AUTOINCREMENT"
+        user_id_type = "INTEGER"
+
+    con.execute(f"""CREATE TABLE IF NOT EXISTS users (
+        id {id_type},
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         created_at TEXT NOT NULL
     )""")
-    con.execute("""CREATE TABLE IF NOT EXISTS sessions (
+    con.execute(f"""CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
-        user_id INTEGER NOT NULL,
+        user_id {user_id_type} NOT NULL,
         created_at TEXT NOT NULL,
         FOREIGN KEY(user_id) REFERENCES users(id)
     )""")
-    con.execute("""CREATE TABLE IF NOT EXISTS predictions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
+    con.execute(f"""CREATE TABLE IF NOT EXISTS predictions (
+        id {id_type},
+        user_id {user_id_type},
         age INTEGER,
         annual_income REAL,
         loan_amount REAL,
@@ -75,6 +117,13 @@ def current_user(session: str = None):
     return dict(row) if row else None
 
 
+def authenticated_user(session: str = None):
+    user = current_user(session)
+    if not user:
+        raise HTTPException(status_code=401, detail="Please log in to continue")
+    return user
+
+
 with db() as con:
     pass
 
@@ -89,11 +138,12 @@ def metrics():
     return json.load(open("models/metrics.json"))
 
 @app.get("/recent")
-def recent(n: int = 8):
+def recent(n: int = 8, session: str = Cookie(default=None)):
+    user = authenticated_user(session)
     con = db()
     rows = con.execute(
-        "SELECT * FROM predictions ORDER BY id DESC LIMIT ?",
-        (n,),
+        "SELECT * FROM predictions WHERE user_id=? ORDER BY id DESC LIMIT ?",
+        (user["id"], max(1, min(n, 100))),
     ).fetchall()
     con.close()
     return [dict(row) for row in rows]
@@ -127,11 +177,11 @@ def health():
 
 @app.post("/predict")
 def predict(loan: Loan, session: str = Cookie(default=None)):
+    user = authenticated_user(session)
     row = loan.model_dump()
     prob = float(model.predict_proba(prepare(pd.DataFrame([row])))[0, 1])
     level, action = (("LOW", "APPROVE") if prob < 0.2 else
                      ("MEDIUM", "MANUAL REVIEW") if prob < 0.5 else ("HIGH", "REJECT"))
-    user = current_user(session)
     con = db()
     con.execute(
         """INSERT INTO predictions
@@ -139,7 +189,7 @@ def predict(loan: Loan, session: str = Cookie(default=None)):
          credit_score, employment_years, dti, open_accounts, home_ownership,
          probability, risk_level, decision, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (user["id"] if user else None, row["age"], row["annual_income"], row["loan_amount"],
+        (user["id"], row["age"], row["annual_income"], row["loan_amount"],
          row["interest_rate"], row["loan_term_months"], row["credit_score"],
          row["employment_years"], row["dti"], row["open_accounts"], row["home_ownership"],
          round(prob, 4), level, action, datetime.datetime.now().isoformat()),
@@ -166,7 +216,10 @@ def register(data: AuthRequest, response: Response):
                 (token, user_id, datetime.datetime.now().isoformat()))
     con.commit()
     con.close()
-    response.set_cookie("session", token, httponly=True, samesite="lax")
+    response.set_cookie(
+        "session", token, httponly=True, samesite="lax",
+        secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
+    )
     return {"name": data.name.strip(), "email": data.email.lower()}
 
 
@@ -182,7 +235,10 @@ def login(data: LoginRequest, response: Response):
                 (token, row["id"], datetime.datetime.now().isoformat()))
     con.commit()
     con.close()
-    response.set_cookie("session", token, httponly=True, samesite="lax")
+    response.set_cookie(
+        "session", token, httponly=True, samesite="lax",
+        secure=os.getenv("COOKIE_SECURE", "false").lower() == "true",
+    )
     return {"name": row["name"], "email": row["email"]}
 
 
@@ -199,9 +255,7 @@ def logout(response: Response, session: str = Cookie(default=None)):
 
 @app.get("/auth/me")
 def me(session: str = Cookie(default=None)):
-    user = current_user(session)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not logged in")
+    user = authenticated_user(session)
     con = db()
     rows = con.execute(
         "SELECT * FROM predictions WHERE user_id=? ORDER BY id DESC LIMIT 20",
